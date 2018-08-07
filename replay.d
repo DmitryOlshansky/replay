@@ -1,7 +1,7 @@
 /**
 	replay - utility to pipe output from logs 
-	honoring the timings + scaling the speed
-	by provided amount
+	honoring the timings and optionally
+	scaling the speed by provided amount
 
 	---
 	
@@ -48,7 +48,29 @@ timespec toTimeSpec(double seconds) {
 }
 
 auto compileFromPattern(string timePattern) {
-	return regex(".//TODO.");
+	string regexPattern;
+	bool inSubPattern;
+	foreach(dchar c; timePattern)  {
+	switch(c) {
+		case 'Y', 'M', 'D', 'H', 'S', 'm':
+			if (inSubPattern)
+				regexPattern ~= `\d`;
+			else {
+				inSubPattern = true;
+				regexPattern ~= `(\d`; //open group
+			}
+		default:
+			if (inSubPattern) {
+				// close on first not well-known char
+				// sub-pattern is closed
+				inSubPattern = false;
+				regexPattern ~= ')';
+			}
+			//TODO: escape special symbols!
+			regexPattern ~= c;
+
+	}
+	debug writeln("REGEX: ", regexPattern);
 }
 
 int main(string[] args) {
