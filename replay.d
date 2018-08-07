@@ -1,16 +1,54 @@
-import core.sys.linux.time;
-import std.getopt, std.regex, std.stdio, std.datetime;
+/**
+	replay - utility to pipe output from logs 
+	honoring the timings + scaling the speed
+	by provided amount
 
-long getnanos(C)(in C captures) {
-	//TODO: assemble time from components
+	---
+	
+	# For instance - pipe at half the speed:
+	replay -s 0.5 < log.log | ./your-log-processor
+
+	# Start at +1.0 and stay 1.0 seconds ahead
+	# of timestamps in log (burst at start!)
+	replay --handicap 1.0 < log.log | ...
+
+	# no handicap and 2.5x faster then events really accured
+	replay -c 0 -s 2.5 < log.log | ...
+
+	---
+	
+	TODO: 
+	1. add buffering amount in seconds to avoid 'handicap' hack.
+	2. more accurate timing
+	3. Windows / xBSD support
+
+*/
+import core.sys.linux.time;
+import std.getopt, std.exception,
+	std.regex, std.stdio, std.conv;
+
+double toSeconds(C)(C captures) {
+	int year = captures["YYYY"].to!int;
+	int month = captures["MM"].to!int;
+	int day = captures["DD"].to!int;
+	int hours = captures["HH"].to!int;
+	int minutes = captures["mm"].to!int;
+	int seconds = captures["SS"].to!int;
+
 	return 0;
 }
 
-timespec toTimeSpec(double seconds)
-{
+// simple but not accurate
+timespec toTimeSpec(double seconds) {
 	timespec ts;
-	//TODO:...
+	ts.tv_sec = cast(long)seconds;
+	double frac = seconds - cast(long)seconds;
+	ts.tv_nsec = cast(long)(frac*1e9);
 	return ts;
+}
+
+auto compileFromPattern(string timePattern) {
+	return regex(".//TODO.");
 }
 
 int main(string[] args) {
@@ -18,7 +56,7 @@ int main(string[] args) {
 	// amount of seconds to stay ahead of timing
 	// basically it must be enough to read line and write line
 	double handicap = 0.001;
-	string pattern = "yyyy-mm-dd HH:MM:SS";
+	string pattern = "YYYY-MM-DD HH:mm:SS";
 
 	getopt(
 		args,
@@ -34,21 +72,26 @@ int main(string[] args) {
 		"Pattern for timestamp following the basics of strftime",
 		&pattern
 	);
+	enforce(speed > 0.0, "speed must be greater then 0.0");
+	enforce(handicap >= 0.0, "handicap must be greater or equal 0.0");
+	auto timeRe = compileFromPattern(pattern);
 
-	auto r = regex(".TODO.");
-	long last = 0;
+	double last = 0; // last visited timestamp
+	// line is mutable and buffer is extended as needed ...
 	foreach(line; stdin.byLine) {
-		// line is mutable and extended as needed...
-		auto m = matchFirst(line, r);
+		auto m = matchFirst(line, timeRe);
 		if(m) {
-			long time = getnanos(m);
-			long delta = time - last;
-			// insert delay to keep the timing mostly in sync
+			double time = m.toSeconds;
+			double delta = time - last;
+			// insert delay to keep the timing
+			// mostly in sync 
+			// this "accuracy" is fine for us now
 			double sleep = (delta - handicap) / speed;
-			timespec wanted = toTimeSpec(sleep);
-			timespec rem;
-			nanosleep(&wanted, &rem);
-			//TODO: check reminder(!) 
+			if (sleep > 1e8) {
+				timespec spec = toTimeSpec(sleep);
+				nanosleep(&spec, &spec);
+				//TODO: check if EINTR (to continue pause) or other error 
+			}
 			last = time;
 		}
 		stdout.write(line);
