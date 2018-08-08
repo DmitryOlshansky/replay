@@ -21,7 +21,8 @@
 	1. add buffering amount in seconds to avoid 'handicap' hack.
 	2. more accurate timing
 	3. Windows / xBSD support
-
+	4. Re-write in C language for smaller footprint
+	   and greater portability?
 */
 import core.sys.linux.time;
 import std.getopt, std.exception,
@@ -34,8 +35,12 @@ double toSeconds(C)(C captures) {
 	int hours = captures["HH"].to!int;
 	int minutes = captures["mm"].to!int;
 	int seconds = captures["SS"].to!int;
-
-	return 0;
+	// we just need monotonic number that is
+	// roughly(!) close to real Unix Epoch (in nano/usecs?)
+	double totalDays = (year*365 + month*30 + day)*24.0;
+	double totalSeconds = hours*3600 + minutes*60 + seconds;
+	// even basic math class would draw a*b as ab...
+	return totalDays*24*3600 + totalSeconds;
 }
 
 // simple but not accurate
