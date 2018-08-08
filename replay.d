@@ -23,6 +23,12 @@
 	3. Windows / xBSD support
 	4. Re-write in C language for smaller footprint
 	   and greater portability?
+
+	P.S. C, C++, D, Rust - all are suitable for this task.
+	However I want D and others (Rust! Nim! Crystal! ...)
+	to eventually replace C++ so D it is.
+
+	For example, Python will never work if I do care about timings!
 */
 import core.sys.linux.time;
 import std.getopt, std.exception,
